@@ -223,8 +223,8 @@ export function buscar(q) {
   const db = app.db;
   return {
     tarefas: db.tarefas.filter(t => tem(t.titulo, t.notas, t.categoria, ...(t.subtarefas || []).map(s => s.titulo))).sort(ordTarefa).slice(0, 40),
-    eventos: db.eventos.filter(e => tem(e.titulo, e.local, e.notas, e.tipo === 'atendimento' ? (paciente(e.pac) || {}).nome : '')).slice(0, 40),
-    pacientes: db.pacientes.filter(p => tem(p.nome, p.obs, p.tel)).slice(0, 30),
+    eventos: db.eventos.filter(e => tem(e.titulo, e.local, e.notas, e.pac ? (paciente(e.pac) || {}).nome : '', e.pac ? (paciente(e.pac) || {}).pront : '')).slice(0, 40),
+    pacientes: db.pacientes.filter(p => tem(p.nome, p.obs, p.tel, p.pront)).slice(0, 30),
     servicos: db.servicos.filter(s => tem(s.nome)).slice(0, 20),
   };
 }

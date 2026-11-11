@@ -1,5 +1,5 @@
 // "Mais": atalhos para módulos, preferências, lembretes, privacidade, backup e cópias automáticas.
-import { $, esc, ic, today, LEMB, TIPO, plural } from './app-util.js';
+import { $, esc, ic, today, LEMB, TIPO, TEMAS, plural } from './app-util.js';
 import { app, salvar, VERSAO_APP, listarCopias, lerCopia, substituirDados, migrar, novo, idbDisponivel, marcarDesfazer } from './app-dados.js';
 import { aberta } from './app-regras.js';
 import { acoes, forms, telas, aoMudar, abrirFolha, fecharFolha, cabecalho, aviso, cabecalhoTela } from './app-ui.js';
@@ -20,9 +20,13 @@ function render() {
 
   <h2>Você</h2><div class="sec"><button class="item" data-act="nome"><div class="grow"><div class="t">${db.nome ? esc(db.nome) : 'Como quer ser chamado?'}</div><div class="meta">Nome exibido na saudação</div></div>${ic('r')}</button></div>
 
+  <h2>Aparência</h2><div class="temas">${Object.entries(TEMAS).map(([k, t]) => `<button class="tema ${(db.cfg.tema || 'classico') === k ? 'on' : ''}" data-act="tema" data-tema="${k}"><span class="amostra">${t.cores.map(c => `<i style="background:${c}"></i>`).join('')}</span>${t.nome}</button>`).join('')}</div>
+  <p class="note">O modo claro ou escuro segue o do celular. Cada tema tem as duas versões.</p>
+
   <h2>Lembretes</h2><div class="sec">
    <div class="item"><div class="grow"><div class="t">Notificações</div><div class="meta">${pTxt}</div></div>${perm === 'default' || (nat && perm === 'denied') ? `<button class="chip on" data-act="permissao">${perm === 'denied' ? 'Abrir ajustes' : 'Ativar'}</button>` : ''}</div>
    <button class="item" data-act="testeAlerta">${ic('bell')}<div class="grow">Testar alerta</div></button>
+   <button class="item" data-act="cfgAtraso">${ic('alert')}<div class="grow"><div class="t">Tarefas atrasadas</div><div class="meta">${textoAtraso(db.cfg.atraso)}</div></div>${ic('r')}</button>
    <button class="item" data-act="lembretesPadrao">${ic('clock')}<div class="grow"><div class="t">Lembrete padrão</div><div class="meta">${Object.entries(TIPO).map(([k, v]) => v + ': ' + LEMB[String(db.cfg.lembretePadrao[k])].toLowerCase()).join(' · ')} · Tarefa: ${LEMB[String(db.cfg.lembretePadrao.tarefa)].toLowerCase()}</div></div>${ic('r')}</button>
   </div>
   <p class="note">${nat ? 'Os alertas chegam mesmo com o app fechado e o celular bloqueado. Se o celular economiza bateria de forma agressiva, deixe o app como <b>Sem restrições</b> nos ajustes de bateria.' : 'Os alertas tocam quando o app está aberto ou foi usado há pouco. Para alarme garantido com o celular bloqueado, use o APK ou o botão <b>Google Agenda</b> no compromisso.'}</p>
@@ -43,10 +47,31 @@ function render() {
 }
 telas.mais = { render, fab: null };
 
+acoes.tema = el => { app.db.cfg.tema = el.dataset.tema; salvar(); app.render(); };
 acoes.permissao = () => pedirPermissao(false);
 acoes.testeAlerta = () => { pedirPermissao(true); setTimeout(() => avisar('Teste de alerta', 'Assim chegam os lembretes da sua agenda', 'teste'), 400); };
 aoMudar.push(el => { if (el.dataset && el.dataset.cfg === 'discreto') { app.db.cfg.discreto = el.checked; salvar(); aviso(el.checked ? 'Modo discreto ativado' : 'Modo discreto desativado'); } });
 
+const INTERVALOS_ATRASO = { 30: 'A cada 30 min', 60: 'A cada 1 hora', 120: 'A cada 2 horas', 180: 'A cada 3 horas', 240: 'A cada 4 horas', 360: 'A cada 6 horas' };
+function textoAtraso(c) {
+  if (!c || !c.ativo) return 'Desligado';
+  return `${(INTERVALOS_ATRASO[c.intervalo] || 'A cada ' + c.intervalo + ' min')}, das ${c.de} às ${c.ate}, enquanto houver tarefa com prazo vencido`;
+}
+acoes.cfgAtraso = () => {
+  const c = app.db.cfg.atraso;
+  abrirFolha(cabecalho('Tarefas atrasadas') + `<form data-form="cfgAtraso"><p class="note top">Quando uma tarefa passa do dia do prazo sem ser concluída, o app avisa com som de tempos em tempos, até você concluir, adiar ou cancelar a tarefa.</p>
+  <div class="f sec"><div class="item"><div class="grow"><div class="t">Avisar tarefas atrasadas</div></div><label class="tog"><input type="checkbox" name="ativo" ${c.ativo ? 'checked' : ''}><span></span></label></div></div>
+  <div class="f"><label class="l">Frequência</label><select class="in" name="intervalo">${Object.entries(INTERVALOS_ATRASO).map(([k, v]) => `<option value="${k}" ${String(c.intervalo) === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+  <div class="f g2"><div><label class="l">A partir de</label><input class="in" type="time" name="de" value="${c.de}" required></div><div><label class="l">Até</label><input class="in" type="time" name="ate" value="${c.ate}" required></div></div>
+  <div class="hint">Fora desse horário o app não avisa (para não tocar de madrugada).</div>
+  <div class="btns"><button class="btn pri" type="submit">Salvar</button></div></form>`);
+};
+forms.cfgAtraso = f => {
+  if (!f.de.value || !f.ate.value || f.ate.value < f.de.value) return aviso('Confira o horário: o fim precisa ser depois do início');
+  app.db.cfg.atraso = { ativo: f.ativo.checked, intervalo: Number(f.intervalo.value), de: f.de.value, ate: f.ate.value };
+  salvar(); fecharFolha(); app.render(); aviso('Salvo');
+  if (f.ativo.checked) pedirPermissao(true);
+};
 acoes.lembretesPadrao = () => {
   const lp = app.db.cfg.lembretePadrao;
   const sel = (k, n) => `<div class="f"><label class="l">${n}</label><select class="in" name="${k}">${Object.entries(LEMB).map(([v, t]) => `<option value="${v}" ${String(lp[k]) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;

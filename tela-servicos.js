@@ -1,5 +1,5 @@
 // Serviços e frentes de atuação: cadastro, esfera (pessoal/profissional), cor e visão de cada frente.
-import { esc, ic, today, addDays, fmtShort, fmtRel, CORES, ESFERA, MODELOS_SERVICO, norm, plural } from './app-util.js';
+import { esc, ic, today, addDays, fmtShort, fmtRel, CORES, ESFERA, MODELOS_SERVICO, norm, plural, TIPO } from './app-util.js';
 import { app, salvar, servico, tocar, marcarDesfazer, registrarExclusao } from './app-dados.js';
 import { ocorrenciasDe, aberta, ordTarefa, atrasada } from './app-regras.js';
 import { acoes, forms, telas, abrirFolha, fecharFolha, cabecalho, aviso, vazio, cabecalhoTela, linhaTarefa, cartaoOcorrencia, criarServico } from './app-ui.js';
@@ -73,7 +73,7 @@ export function detalheServico(id) {
   const realiz = ocorrenciasDe(evs, addDays(t0, -30), addDays(t0, -1)).filter(o => o.status !== 'desmarcou');
   const histItens = [
     ...concl.map(t => ({ ord: new Date(t.concluidaEm).toISOString().slice(0, 10), txt: 'Tarefa concluída: ' + esc(t.titulo) })),
-    ...realiz.map(o => ({ ord: o.data, txt: (o.ev.tipo === 'atendimento' ? 'Atendimento' : 'Compromisso') + (o.status ? ' (' + o.status + ')' : '') + ': ' + esc(o.ev.tipo === 'atendimento' ? 'sessão' : o.ev.titulo) })),
+    ...realiz.map(o => ({ ord: o.data, txt: (TIPO[o.ev.tipo] || 'Compromisso') + (o.status ? ' (' + o.status + ')' : '') + ': ' + esc(o.ev.tipo === 'atendimento' ? 'sessão' : o.ev.titulo) })),
   ].sort((a, b) => b.ord.localeCompare(a.ord)).slice(0, 15);
   abrirFolha(cabecalho(`<i class="sw lg" style="--c:${s.cor}"></i>${esc(s.nome)}`) + `
   <p class="note top">${ESFERA[s.esfera || 'profissional']}${s.arquivado ? ' · arquivado' : ''}</p>

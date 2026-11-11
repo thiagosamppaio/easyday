@@ -1,5 +1,5 @@
 /* ===== Agenda · estilos ===== */
-:root{--bg:#f4f1eb;--card:#fffdf9;--ink:#1c2320;--mute:#66706b;--line:#e3ddd2;--acc:#2f6f68;--on:#fff;--soft:#e4eeeb;--danger:#b4442f;--ok:#3a7a4c;--warn:#a87410;--prog:#3b6fb6;--sh:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);color-scheme:light}
+:root{--acc-claro:#2f6f68;--bg:#f4f1eb;--card:#fffdf9;--ink:#1c2320;--mute:#66706b;--line:#e3ddd2;--acc:#2f6f68;--on:#fff;--soft:#e4eeeb;--danger:#b4442f;--ok:#3a7a4c;--warn:#a87410;--prog:#3b6fb6;--sh:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);color-scheme:light}
 @media(prefers-color-scheme:dark){:root{--bg:#111513;--card:#1a1f1d;--ink:#e6ebe8;--mute:#98a29d;--line:#2a312e;--acc:#6db3a8;--on:#0c1110;--soft:#1c2a27;--danger:#e07a63;--ok:#7cbc8a;--warn:#e0b04f;--prog:#7fa7e0;--sh:none;color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -254,7 +254,7 @@ details.dicas div{margin-top:6px;line-height:1.5}
 #toast span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #toast.on{opacity:1;transform:translateX(-50%);pointer-events:auto}
 #toast button{color:var(--acc);font-weight:700;filter:brightness(1.4);white-space:nowrap}
-@media(prefers-color-scheme:dark){#toast button{filter:none;color:#2f6f68}}
+@media(prefers-color-scheme:dark){#toast button{filter:none;color:var(--acc-claro,#2f6f68)}}
 /* telas grandes: menu lateral */
 @media(min-width:900px){
  body{padding-left:220px}
@@ -274,3 +274,21 @@ details.dicas div{margin-top:6px;line-height:1.5}
 }
 @media(min-width:900px) and (max-width:1100px){.grade{grid-template-columns:1fr}}
 @media(max-width:360px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+/* lista de pacientes sugeridos */
+.sugest{margin-top:6px}
+.sugest .item{text-align:left}
+.pacnovo{margin-top:10px}
+
+/* ===== temas (Mais › Aparência) ===== */
+:root[data-tema=oceano]{--acc-claro:#2c5c9a;--bg:#eef2f7;--card:#ffffff;--ink:#17202b;--mute:#5d6977;--line:#d8e0ea;--acc:#2c5c9a;--on:#fff;--soft:#e2eaf5;--prog:#7a5cb8}
+:root[data-tema=terracota]{--acc-claro:#b0532d;--bg:#f8f1ea;--card:#fffaf5;--ink:#2a1e18;--mute:#76665b;--line:#ead9ca;--acc:#b0532d;--on:#fff;--soft:#f4e2d5;--prog:#4e7a8a}
+@media(prefers-color-scheme:dark){
+ :root[data-tema=oceano]{--bg:#0e131a;--card:#161d26;--ink:#e3e9f1;--mute:#93a0af;--line:#25303d;--acc:#82abe6;--on:#0a1018;--soft:#1a2535;--prog:#b39ae0}
+ :root[data-tema=terracota]{--bg:#16100d;--card:#201814;--ink:#efe4dc;--mute:#a8968a;--line:#35291f;--acc:#e48f66;--on:#1a0e09;--soft:#2f2019;--prog:#86b4c4}
+}
+.temas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tema{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 6px;border-radius:14px;background:var(--card);border:2px solid var(--line);font-size:.85rem;text-align:center}
+.tema.on{border-color:var(--acc);font-weight:600}
+.tema .amostra{display:flex;width:100%;max-width:90px;height:34px;border-radius:9px;overflow:hidden;border:1px solid rgba(0,0,0,.08)}
+.tema .amostra i{flex:1}

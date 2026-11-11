@@ -39,8 +39,19 @@ export const fmtHoras = min => { const h = Math.floor(min / 60), m = Math.round(
 export const CORES = ['#2f6f68', '#3b6fb6', '#8a5cb8', '#c0563b', '#c58a1b', '#4e8a3e', '#b5487a', '#5b6770', '#0f8a9c', '#7a5c3e'];
 export const REP = { nao: 'Não repete', dia: 'Todos os dias', util: 'Dias úteis (seg–sex)', sem: 'Toda semana', quinz: 'A cada 2 semanas', mes: 'Todo mês' };
 export const LEMB = { '-1': 'Sem lembrete', '0': 'Na hora', '5': '5 min antes', '10': '10 min antes', '15': '15 min antes', '30': '30 min antes', '60': '1 hora antes', '120': '2 horas antes', '1440': '1 dia antes' };
+/** Repetição do alerta até ser visto (minutos entre um toque e outro). */
+export const REP_LEMB = { '0': 'Não repetir', '5': 'A cada 5 min', '10': 'A cada 10 min', '15': 'A cada 15 min', '30': 'A cada 30 min', '60': 'A cada 1 hora', '120': 'A cada 2 horas' };
+export const MAX_REP_LEMB = 10; // toca no máximo 10 vezes além da primeira
+export const campoRepLemb = v => `<div class="f"><label class="l">Repetir o alerta</label><select class="in" name="repLemb">${Object.entries(REP_LEMB).map(([k, t]) => `<option value="${k}" ${String(v || 0) === k ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="hint">O alerta volta a tocar até você tocar em <b>Visto</b> (no máximo ${MAX_REP_LEMB} vezes).</div></div>`;
 export const TIPO = { compromisso: 'Compromisso', atendimento: 'Atendimento', atividade: 'Atividade' };
+/** Tipos de item ligados a um paciente. */
+export const COM_PAC = t => t === 'atendimento';
 export const STL = { realizado: 'Realizado', faltou: 'Faltou', desmarcou: 'Desmarcou' };
+export const TEMAS = {
+  classico: { nome: 'Verde', cores: ['#f4f1eb', '#2f6f68', '#e4eeeb', '#1c2320'] },
+  oceano: { nome: 'Azul oceano', cores: ['#eef2f7', '#2c5c9a', '#e2eaf5', '#17202b'] },
+  terracota: { nome: 'Terracota', cores: ['#f8f1ea', '#b0532d', '#f4e2d5', '#2a1e18'] },
+};
 export const PRIO = { alta: 'Alta', media: 'Normal', baixa: 'Baixa' };
 export const PRIO_ORDEM = { alta: 0, media: 1, baixa: 2 };
 export const STATUS = { pendente: 'Pendente', andamento: 'Em andamento', concluida: 'Concluída', cancelada: 'Cancelada' };

@@ -1,8 +1,8 @@
 // Agenda: visões dia / semana / mês, cadastro, detalhe, remarcação, conflitos e exclusão.
-import { $, esc, ic, uid, clone, today, addDays, parse, fmtLong, fmtShort, fmtRel, fmtDM, inicioSemana, inicioMes, fimMes, addMeses, addMin, pad, DOW, MES, MES_LONGO, REP, LEMB, TIPO, STL } from './app-util.js';
+import { $, esc, ic, uid, clone, today, addDays, parse, fmtLong, fmtShort, fmtRel, fmtDM, inicioSemana, inicioMes, fimMes, addMeses, addMin, pad, DOW, MES, MES_LONGO, REP, LEMB, REP_LEMB, campoRepLemb, TIPO, STL, COM_PAC, norm, iniciais } from './app-util.js';
 import { app, salvar, servico, paciente, tocar, marcarDesfazer, registrarExclusao } from './app-dados.js';
 import { ocorrencias, ocorrenciasDoDia, ocorrencia, chavesEmConflito, conflitosDe, evTitulo, passaFiltro, aberta, ordTarefa, atrasada } from './app-regras.js';
-import { acoes, forms, telas, aoMudar, abrirFolha, fecharFolha, cabecalho, aviso, chips, cartaoOcorrencia, linhaTarefa, vazio, opcoesServico, campoNovoServico, servicoDoForm, cabecalhoTela, corServico } from './app-ui.js';
+import { acoes, forms, telas, aoMudar, aoDigitar, abrirFolha, fecharFolha, cabecalho, aviso, chips, cartaoOcorrencia, linhaTarefa, vazio, opcoesServico, campoNovoServico, servicoDoForm, cabecalhoTela, corServico } from './app-ui.js';
 import { pedirPermissao } from './app-notif.js';
 
 const st = () => app.st;
@@ -105,27 +105,83 @@ function proxHorario(day) {
   return pad(Math.floor(m / 60)) + ':' + pad(m % 60);
 }
 const durPadrao = tipo => tipo === 'atendimento' ? 40 : 60;
+
+// ---------- paciente: busca por nome ou nº do prontuário ----------
+const soDig = s => String(s || '').replace(/\D/g, '');
+const rotuloPac = p => (app.db.cfg.discreto ? iniciais(p.nome) : p.nome) + (p.pront ? ' · Pront. ' + p.pront : '');
+/** Pacientes cujo nome ou prontuário combinam com o texto digitado. */
+export function acharPacientes(q, idAtual) {
+  const n = norm(q), d = soDig(q);
+  if (!n) return [];
+  const ok = p => norm(p.nome).includes(n) || (p.pront && (norm(p.pront).includes(n) || (d.length >= 2 && soDig(p.pront).includes(d))));
+  const pront = p => d && soDig(p.pront) === d ? 0 : norm(p.nome).startsWith(n) ? 1 : 2;
+  return app.db.pacientes.filter(p => (p.ativo !== false || p.id === idAtual) && ok(p))
+    .sort((a, b) => pront(a) - pront(b) || a.nome.localeCompare(b.nome, 'pt-BR')).slice(0, 6);
+}
+function mostrarSugestoes(f) {
+  const box = f.querySelector('.sugest'), q = f.pacTxt.value.trim();
+  if (!q) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  const ps = acharPacientes(q, f.pac.value);
+  box.innerHTML = ps.map(p => `<button type="button" class="item" data-act="pacEscolher" data-id="${p.id}">${ic('user')}<div class="grow"><div class="t">${esc(app.db.cfg.discreto ? iniciais(p.nome) : p.nome)}</div><div class="meta">${[p.pront ? 'Prontuário ' + esc(p.pront) : '', p.ativo === false ? 'arquivado' : ''].filter(Boolean).join(' · ') || 'Sem prontuário cadastrado'}</div></div></button>`).join('')
+    + `<button type="button" class="item" data-act="pacNovoAqui">${ic('plus')}<div class="grow"><div class="t">Cadastrar novo paciente</div><div class="meta">${ps.length ? 'Não é nenhum desses' : 'Nenhum paciente encontrado com “' + esc(q) + '”'}</div></div></button>`;
+  box.style.display = 'block';
+}
+function preencherComPaciente(f, p) {
+  if (!f.servico.value && p.servico) f.servico.value = p.servico;
+}
+aoDigitar.push(el => {
+  if (el.name !== 'pacTxt' || !el.form) return;
+  const f = el.form; f.pac.value = ''; f.querySelector('.pacnovo').style.display = 'none';
+  mostrarSugestoes(f);
+});
+acoes.pacEscolher = el => {
+  const f = el.closest('form'), p = paciente(el.dataset.id); if (!f || !p) return;
+  f.pac.value = p.id; f.pacTxt.value = rotuloPac(p);
+  const box = f.querySelector('.sugest'); box.innerHTML = ''; box.style.display = 'none';
+  f.querySelector('.pacnovo').style.display = 'none';
+  preencherComPaciente(f, p);
+};
+// Enter no campo do paciente: se só um combina, escolhe ele (em vez de enviar o formulário)
+document.addEventListener('keydown', e => {
+  const el = e.target; if (e.key !== 'Enter' || !el || el.name !== 'pacTxt' || !el.form) return;
+  e.preventDefault();
+  const bs = el.form.querySelectorAll('.sugest [data-act="pacEscolher"]');
+  if (bs.length === 1) acoes.pacEscolher(bs[0]);
+});
+acoes.pacNovoAqui = el => {
+  const f = el.closest('form'); if (!f) return;
+  const q = f.pacTxt.value.trim(), box = f.querySelector('.sugest');
+  box.innerHTML = ''; box.style.display = 'none';
+  f.pac.value = '__novo';
+  if (/^[\d.\-\/\s]+$/.test(q)) { f.pacPront.value = q; f.pacNovo.value = ''; } else { f.pacNovo.value = q; }
+  f.querySelector('.pacnovo').style.display = 'block';
+  (f.pacNovo.value ? f.pacPront : f.pacNovo).focus();
+};
 export function formEvento(base = {}) {
   const novo = !base.id, lp = app.db.cfg.lembretePadrao;
   const tipo0 = base.tipo || 'compromisso';
   const ev = Object.assign({ tipo: tipo0, titulo: '', servico: st().filtro || '', pac: '', data: st().dia, ini: '', fim: '', rep: 'nao', ate: '', lembrete: lp[tipo0] ?? 15, local: '', notas: '' }, base);
   if (!ev.ini) ev.ini = proxHorario(ev.data);
   if (!ev.fim && novo) ev.fim = addMin(ev.ini, durPadrao(ev.tipo));
-  if (novo && ev.tipo === 'atendimento' && !ev.servico && ev.pac) { const p = paciente(ev.pac); if (p && p.servico) ev.servico = p.servico; }
-  const pacs = app.db.pacientes.filter(p => p.ativo !== false || p.id === ev.pac).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  const nomeP = p => app.db.cfg.discreto ? p.nome.split(/\s+/).map(w => w[0] + '.').join(' ') : p.nome;
+  const p0 = ev.pac ? paciente(ev.pac) : null;
+  if (novo && COM_PAC(ev.tipo) && p0 && !ev.servico && p0.servico) ev.servico = p0.servico;
   abrirFolha(cabecalho(novo ? 'Novo item na agenda' : 'Editar') + `
   <form data-form="evento" data-id="${ev.id || ''}" data-tipo="${ev.tipo}" data-rep="${ev.rep !== 'nao' ? 'sim' : 'nao'}" data-novo="${novo ? 1 : 0}">
   <div class="f seg">${Object.entries(TIPO).map(([k, v]) => `<label><input type="radio" name="tipo" value="${k}" ${ev.tipo === k ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div>
-  <div class="f so-at"><label class="l">Paciente</label><select class="in" name="pac" data-novopara="pac"><option value="">Escolha…</option>${pacs.map(p => `<option value="${p.id}" ${p.id === ev.pac ? 'selected' : ''}>${esc(nomeP(p))}</option>`).join('')}<option value="__novo">+ Novo paciente…</option></select></div>
-  <div class="f so-novo" data-novo="pac"><input class="in" name="pacNovo" placeholder="Nome (ou iniciais) do novo paciente" maxlength="60"></div>
-  <div class="f nao-at"><label class="l">Título</label><input class="in" name="titulo" value="${ev.tipo !== 'atendimento' ? esc(ev.titulo) : ''}" placeholder="Ex.: Reunião de equipe" maxlength="100"></div>
-  <div class="f so-at"><label class="l">Observação</label><input class="in" name="tituloAt" value="${ev.tipo === 'atendimento' ? esc(ev.titulo) : ''}" placeholder="Observação curta (opcional)" maxlength="60"></div>
+  <div class="f so-at"><label class="l">Paciente</label><input type="hidden" name="pac" value="${esc(ev.pac || '')}">
+  <input class="in" name="pacTxt" value="${p0 ? esc(rotuloPac(p0)) : ''}" placeholder="Digite o nome ou o nº do prontuário" autocomplete="off" maxlength="60" enterkeyhint="search">
+  <div class="sec sugest" style="display:none"></div>
+  <div class="pacnovo" style="display:none"><div class="hint">Novo paciente — fica salvo para as próximas vezes.</div>
+  <div class="f"><label class="l">Nome</label><input class="in" name="pacNovo" placeholder="Nome, iniciais ou apelido" maxlength="60"></div>
+  <div class="f g2"><div><label class="l">Nº do prontuário</label><input class="in" name="pacPront" inputmode="numeric" placeholder="Opcional" maxlength="30"></div><div><label class="l">Telefone</label><input class="in" type="tel" name="pacTel" placeholder="Opcional" maxlength="20"></div></div></div></div>
+  <div class="f nao-at"><label class="l">Título</label><input class="in" name="titulo" value="${!COM_PAC(ev.tipo) ? esc(ev.titulo) : ''}" placeholder="Ex.: Reunião de equipe" maxlength="100"></div>
+  <div class="f so-at"><label class="l">Observação</label><input class="in" name="tituloAt" value="${COM_PAC(ev.tipo) ? esc(ev.titulo) : ''}" placeholder="Observação curta (opcional)" maxlength="60"></div>
   <div class="f"><label class="l">Serviço</label><select class="in" name="servico" data-novopara="servico">${opcoesServico(ev.servico)}</select></div>${campoNovoServico}
   <div class="f"><label class="l">Data</label><input class="in" type="date" name="data" value="${ev.data}" required></div>
   <div class="f g2"><div><label class="l">Início</label><input class="in" type="time" name="ini" value="${ev.ini}" required></div><div><label class="l">Término</label><input class="in" type="time" name="fim" value="${ev.fim}" data-auto="${novo ? 1 : 0}"></div></div>
   <div class="f g2"><div><label class="l">Repetir</label><select class="in" name="rep">${Object.entries(REP).map(([k, v]) => `<option value="${k}" ${ev.rep === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
   <div><label class="l">Lembrete</label><select class="in" name="lembrete" data-auto="${novo ? 1 : 0}">${Object.entries(LEMB).map(([k, v]) => `<option value="${k}" ${String(ev.lembrete) === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
+  ${campoRepLemb(ev.repLemb)}
   <div class="f so-rep"><label class="l">Repetir até (opcional)</label><input class="in" type="date" name="ate" value="${ev.ate || ''}"></div>
   <div class="f"><label class="l">Local</label><input class="in" name="local" value="${esc(ev.local)}" placeholder="Opcional" maxlength="100"></div>
   <div class="f"><label class="l">Anotações</label><textarea class="in" name="notas" placeholder="Opcional" maxlength="2000">${esc(ev.notas)}</textarea>
@@ -146,7 +202,6 @@ aoMudar.push((el) => {
   if (el.name === 'rep') f.dataset.rep = el.value !== 'nao' ? 'sim' : 'nao';
   if (el.name === 'ini' && f.fim.dataset.auto === '1' && el.value) f.fim.value = addMin(el.value, durPadrao(f.dataset.tipo));
   if (el.name === 'fim') el.dataset.auto = '0';
-  if (el.name === 'pac' && el.value && el.value !== '__novo' && !f.servico.value) { const p = paciente(el.value); if (p && p.servico) f.servico.value = p.servico; }
 });
 /** Mostra aviso de conflito no formulário; retorna true se deve parar para o usuário confirmar. */
 export function checarConflito(f, cand, ignorarId) {
@@ -166,9 +221,13 @@ forms.evento = f => {
   const tipo = g('tipo');
   const sv = servicoDoForm(fd); if (sv === null) return;
   let pacId = g('pac');
-  if (tipo === 'atendimento') {
-    if (pacId === '__novo') { if (!g('pacNovo')) return aviso('Informe o nome do paciente'); }
-    else if (!pacId) return aviso('Escolha o paciente');
+  const comPac = COM_PAC(tipo);
+  if (comPac) {
+    if (pacId === '__novo') {
+      if (!g('pacNovo')) return aviso('Informe o nome do paciente');
+      const dup = g('pacPront') && app.db.pacientes.find(p => p.pront && soDig(p.pront) === soDig(g('pacPront')));
+      if (dup) return aviso('Esse prontuário já está cadastrado: ' + (app.db.cfg.discreto ? iniciais(dup.nome) : dup.nome));
+    } else if (!pacId || !paciente(pacId)) return aviso(g('pacTxt') ? 'Toque no paciente na lista ou em “Cadastrar novo paciente”' : 'Informe o paciente');
   } else if (!g('titulo')) return aviso('Dê um título');
   const data = g('data'), ini = g('ini'); if (!data || !ini) return aviso('Informe data e horário');
   let fim = g('fim'); if (fim && fim <= ini) fim = '';
@@ -176,10 +235,10 @@ forms.evento = f => {
   let ate = rep !== 'nao' ? g('ate') : ''; if (ate && ate < data) ate = '';
   const id = f.dataset.id, atual = id ? app.db.eventos.find(e => e.id === id) : null;
   if (checarConflito(f, { data, ini, fim, rep, ate, occ: atual ? atual.occ : {} }, id)) return;
-  if (tipo === 'atendimento' && pacId === '__novo') {
-    const p = tocar({ id: uid(), nome: g('pacNovo'), tel: '', servico: sv, obs: '', ativo: true }); app.db.pacientes.push(p); pacId = p.id;
+  if (comPac && pacId === '__novo') {
+    const p = tocar({ id: uid(), nome: g('pacNovo'), pront: g('pacPront'), tel: g('pacTel'), servico: sv, obs: '', ativo: true }); app.db.pacientes.push(p); pacId = p.id;
   }
-  const dados = { tipo, titulo: tipo === 'atendimento' ? g('tituloAt') : g('titulo'), pac: tipo === 'atendimento' ? pacId : '', servico: sv, data, ini, fim, rep, ate, lembrete: Number(g('lembrete')), local: g('local'), notas: g('notas') };
+  const dados = { tipo, titulo: comPac ? g('tituloAt') : g('titulo'), pac: comPac ? pacId : '', servico: sv, data, ini, fim, rep, ate, lembrete: Number(g('lembrete')), repLemb: Number(g('repLemb')) || 0, local: g('local'), notas: g('notas') };
   if (atual) {
     if (atual.rep === 'nao' && rep === 'nao' && atual.data !== data && atual.occ[atual.data]) { atual.occ[data] = atual.occ[atual.data]; delete atual.occ[atual.data]; }
     Object.assign(atual, dados); tocar(atual);
@@ -194,7 +253,7 @@ acoes.evEditar = el => { const ev = app.db.eventos.find(e => e.id === el.dataset
 // ---------- detalhe ----------
 export function detalheOcorrencia(evId, orig) {
   const o = ocorrencia(evId, orig); if (!o) return;
-  const ev = o.ev, s = servico(ev.servico), p = ev.tipo === 'atendimento' ? paciente(ev.pac) : null;
+  const ev = o.ev, s = servico(ev.servico), p = COM_PAC(ev.tipo) ? paciente(ev.pac) : null;
   const conf = conflitosDe({ data: o.data, ini: o.ini, fim: o.fim, rep: 'nao' }, ev.id);
   abrirFolha(cabecalho(esc(TIPO[ev.tipo])) + `
   <div class="card det" style="--c:${s ? s.cor : 'var(--line)'}">
@@ -205,12 +264,13 @@ export function detalheOcorrencia(evId, orig) {
   ${o.movida ? `<div>${ic('move')}<span>Remarcado · original: ${fmtShort(o.orig)} às ${ev.ini}</span></div>` : ''}
   ${ev.rep !== 'nao' ? `<div>${ic('rep')}<span>${REP[ev.rep]}${ev.ate ? ' até ' + fmtShort(ev.ate) : ''}</span></div>` : ''}
   ${s ? `<div>${ic('tag')}<span>${esc(s.nome)}</span></div>` : ''}
+  ${p && p.pront ? `<div>${ic('note')}<span>Prontuário ${esc(p.pront)}</span></div>` : ''}
   ${ev.local ? `<div>${ic('pin')}<span>${esc(ev.local)}</span></div>` : ''}
-  <div>${ic('bell')}<span>${LEMB[String(ev.lembrete)] || 'Sem lembrete'}</span></div>
+  <div>${ic('bell')}<span>${LEMB[String(ev.lembrete)] || 'Sem lembrete'}${ev.lembrete >= 0 && ev.repLemb ? ' · repete ' + REP_LEMB[String(ev.repLemb)].toLowerCase() : ''}</span></div>
   ${ev.notas ? `<div>${ic('note')}<span class="pre">${esc(ev.notas)}</span></div>` : ''}
   </div></div>
   ${conf.length ? `<div class="banner">${ic('alert')}<span>Conflita com <b>${esc(evTitulo(conf[0].ev, false))}</b> (${conf[0].ini}${conf[0].fim ? '–' + conf[0].fim : ''})${conf.length > 1 ? ` e mais ${conf.length - 1}` : ''}.</span></div>` : ''}
-  ${ev.tipo === 'atendimento' ? `<h2>Presença nesta sessão</h2><div class="stset">${Object.entries(STL).map(([k, v]) => `<button class="${k} ${o.status === k ? 'on' : ''}" data-act="evStatus" data-id="${ev.id}" data-orig="${o.orig}" data-st="${k}">${v}</button>`).join('')}</div>
+  ${COM_PAC(ev.tipo) ? `<h2>Presença nesta sessão</h2><div class="stset">${Object.entries(STL).map(([k, v]) => `<button class="${k} ${o.status === k ? 'on' : ''}" data-act="evStatus" data-id="${ev.id}" data-orig="${o.orig}" data-st="${k}">${v}</button>`).join('')}</div>
   ${p ? `<div class="btns"><button class="btn" data-act="paciente" data-id="${p.id}">${ic('user')}Ver paciente</button></div>` : ''}` : ''}
   <div class="btns h"><button class="btn" data-act="evRemarcar" data-id="${ev.id}" data-orig="${o.orig}">${ic('move')}Remarcar</button><button class="btn" data-act="evEditar" data-id="${ev.id}">Editar</button></div>
   ${o.movida ? `<div class="btns"><button class="btn" data-act="evDesmover" data-id="${ev.id}" data-orig="${o.orig}">Desfazer remarcação</button></div>` : ''}
@@ -224,7 +284,7 @@ function linkGoogle(o) {
   const d = (rec ? ev.data : o.data).replace(/-/g, ''), ini = rec ? ev.ini : o.ini, fim = (rec ? ev.fim : o.fim) || addMin(ini, 60);
   let u = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(evTitulo(ev, true)) + '&dates=' + d + 'T' + ini.replace(':', '') + '00/' + d + 'T' + fim.replace(':', '') + '00&ctz=' + encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo');
   if (ev.local) u += '&location=' + encodeURIComponent(ev.local);
-  if (ev.notas && ev.tipo !== 'atendimento') u += '&details=' + encodeURIComponent(ev.notas);
+  if (ev.notas && !COM_PAC(ev.tipo)) u += '&details=' + encodeURIComponent(ev.notas);
   const rr = { dia: 'FREQ=DAILY', util: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', sem: 'FREQ=WEEKLY', quinz: 'FREQ=WEEKLY;INTERVAL=2', mes: 'FREQ=MONTHLY' }[ev.rep];
   if (rr && rec) u += '&recur=' + encodeURIComponent('RRULE:' + rr + (ev.ate ? ';UNTIL=' + ev.ate.replace(/-/g, '') + 'T235959Z' : ''));
   return u;

@@ -1,5 +1,5 @@
 // Inicialização, navegação e eventos globais.
-import { $, ic, today } from './app-util.js';
+import { $, ic, today, TEMAS } from './app-util.js';
 import { app, carregar } from './app-dados.js';
 import { acoes, forms, telas, aoMudar, aoDigitar, sheetAberta, fecharFolha, aviso } from './app-ui.js';
 import { verificar, agendarSincronizacao, sincronizarAlarmes, definirSW } from './app-notif.js';
@@ -13,7 +13,14 @@ import { formNome, importarArquivo, instalacao } from './tela-mais.js';
 
 const NAV = [['inicio', 'home', 'Início'], ['agenda', 'cal', 'Agenda'], ['tarefas', 'tasks', 'Tarefas'], ['mais', 'more', 'Mais']];
 
+/** Aplica o tema escolhido (cores) à página e à barra do navegador. */
+function aplicarTema() {
+  const t = TEMAS[app.db.cfg.tema] ? app.db.cfg.tema : 'classico', h = document.documentElement;
+  if (t === 'classico') delete h.dataset.tema; else h.dataset.tema = t;
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = TEMAS[t].cores[1];
+}
 function render() {
+  aplicarTema();
   const st = app.st, tela = telas[st.tab] || telas.inicio;
   $('#main').innerHTML = tela.render();
   const aba = tela.aba || st.tab;

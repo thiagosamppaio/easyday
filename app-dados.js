@@ -2,7 +2,7 @@
 // cópias automáticas diárias e "desfazer".
 import { today, norm } from './app-util.js';
 
-export const VERSAO_APP = '2.0';
+export const VERSAO_APP = '2.1';
 const KEY_V1 = 'agenda.dados.v1';   // versão 1 (nunca é apagada: fica como cópia de segurança)
 const KEY_V2 = 'agenda.dados.v2';   // reserva, usada só se o IndexedDB falhar
 const DB_NOME = 'agenda', DB_VER = 1;
@@ -20,7 +20,7 @@ export const app = {
 export function novo() {
   return {
     v: 2, nome: '',
-    cfg: { discreto: false, boas: false, esfera: '', lembretePadrao: { atendimento: 15, compromisso: 15, atividade: 15, tarefa: 15 } },
+    cfg: { discreto: false, boas: false, esfera: '', tema: 'classico', atraso: { ativo: true, intervalo: 120, de: '08:00', ate: '20:00' }, lembretePadrao: { atendimento: 15, compromisso: 15, atividade: 15, tarefa: 15 } },
     servicos: [], eventos: [], tarefas: [], pacientes: [], projetos: [], notas: [],
     exclusoes: [],   // registro de itens excluídos (preparação para sincronização futura)
   };
@@ -49,6 +49,7 @@ export function migrar(d) {
   Object.assign(n, d);
   n.cfg = Object.assign(novo().cfg, d.cfg || {});
   n.cfg.lembretePadrao = Object.assign(novo().cfg.lembretePadrao, (d.cfg || {}).lembretePadrao || {});
+  n.cfg.atraso = Object.assign(novo().cfg.atraso, (d.cfg || {}).atraso || {});
   for (const k of ['servicos', 'eventos', 'tarefas', 'pacientes', 'projetos', 'notas', 'exclusoes']) if (!Array.isArray(n[k])) n[k] = [];
   n.tarefas.forEach(t => { t.subtarefas = t.subtarefas || []; t.historico = t.historico || []; t.status = t.status || 'pendente'; t.categoria = t.categoria || ''; });
   n.eventos.forEach(e => { e.occ = e.occ || {}; });

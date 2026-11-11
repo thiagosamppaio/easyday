@@ -1,5 +1,5 @@
 // Tarefas: lista agrupada, filtros, detalhe com status, subtarefas, adiamento e histórico.
-import { esc, ic, uid, today, addDays, fmtShort, fmtRel, proximaSegunda, LEMB, PRIO, STATUS, plural } from './app-util.js';
+import { esc, ic, uid, today, addDays, fmtShort, fmtRel, proximaSegunda, LEMB, REP_LEMB, campoRepLemb, PRIO, STATUS, plural } from './app-util.js';
 import { app, salvar, servico, tocar, marcarDesfazer, registrarExclusao } from './app-dados.js';
 import { aberta, atrasada, ordTarefa, hist, definirStatus, definirPrazo, passaFiltroTarefa, categorias, passaFiltro } from './app-regras.js';
 import { acoes, forms, telas, aoMudar, abrirFolha, fecharFolha, cabecalho, aviso, chips, linhaTarefa, vazio, opcoesServico, campoNovoServico, servicoDoForm, cabecalhoTela, sheetAberta } from './app-ui.js';
@@ -43,6 +43,7 @@ function resumoFiltros() {
 telas.tarefas = { render };
 
 acoes.tfStatus = el => { st().tf.status = el.value; app.render(); };
+acoes.irAtrasadas = () => { Object.assign(st().tf, { status: 'abertas', prio: '', cat: '', periodo: 'atrasadas' }); st().tab = 'tarefas'; if (sheetAberta()) fecharFolha(); app.render(); scrollTo(0, 0); };
 acoes.tfLimpar = () => { Object.assign(st().tf, { prio: '', cat: '', periodo: '' }); app.render(); };
 acoes.tfFiltros = () => {
   const f = st().tf, cats = categorias();
@@ -85,6 +86,7 @@ export function formTarefa(base = {}) {
   <div class="f g2"><div><label class="l">Prazo</label><input class="in" type="date" name="prazo" value="${t.prazo}"></div><div><label class="l">Horário</label><input class="in" type="time" name="hora" value="${t.hora}"></div></div>
   <div class="f"><label class="l">Prioridade</label><div class="seg">${Object.entries(PRIO).map(([k, v]) => `<label><input type="radio" name="prio" value="${k}" ${t.prio === k ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div></div>
   <div class="f"><label class="l">Lembrete</label><select class="in" name="lembrete">${Object.entries(LEMB).map(([k, v]) => `<option value="${k}" ${String(t.lembrete) === k ? 'selected' : ''}>${v}</option>`).join('')}</select><div class="hint">O lembrete precisa de prazo e horário.</div></div>
+  ${campoRepLemb(t.repLemb)}
   ${novo ? `<div class="f"><label class="l">Subtarefas</label><textarea class="in" name="subs" placeholder="Uma por linha (opcional)" maxlength="2000"></textarea></div>` : ''}
   <div class="f"><label class="l">Anotações</label><textarea class="in" name="notas" maxlength="3000" placeholder="Opcional">${esc(t.notas)}</textarea></div>
   <div class="btns"><button class="btn pri" type="submit">Salvar</button></div></form>`);
@@ -94,7 +96,7 @@ forms.tarefa = f => {
   if (!g('titulo')) return aviso('Escreva a tarefa');
   const sv = servicoDoForm(fd); if (sv === null) return;
   const prazo = g('prazo');
-  const dados = { titulo: g('titulo'), servico: sv, categoria: g('categoria'), hora: prazo ? g('hora') : '', prio: g('prio') || 'media', lembrete: Number(g('lembrete')), notas: g('notas') };
+  const dados = { titulo: g('titulo'), servico: sv, categoria: g('categoria'), hora: prazo ? g('hora') : '', prio: g('prio') || 'media', lembrete: Number(g('lembrete')), repLemb: Number(g('repLemb')) || 0, notas: g('notas') };
   const id = f.dataset.id;
   let t;
   if (id) {
@@ -133,7 +135,7 @@ export function detalheTarefa(id) {
     ${t.prazo ? `<div>${ic('cal')}<span class="${late ? 'late' : ''}">${fmtRel(t.prazo)}${t.hora ? ' às ' + t.hora : ''}${late ? ' · atrasada' : ''}</span></div>` : `<div>${ic('cal')}<span class="sub">Sem prazo</span></div>`}
     <div>${ic('zap')}<span>Prioridade ${PRIO[t.prio || 'media'].toLowerCase()}</span></div>
     ${s ? `<div>${ic('tag')}<span>${esc(s.nome)}${t.categoria ? ' · ' + esc(t.categoria) : ''}</span></div>` : t.categoria ? `<div>${ic('tag')}<span>${esc(t.categoria)}</span></div>` : ''}
-    ${t.lembrete >= 0 && t.prazo && t.hora ? `<div>${ic('bell')}<span>${LEMB[String(t.lembrete)]}</span></div>` : ''}
+    ${t.lembrete >= 0 && t.prazo && t.hora ? `<div>${ic('bell')}<span>${LEMB[String(t.lembrete)]}${t.repLemb ? ' · repete ' + REP_LEMB[String(t.repLemb)].toLowerCase() : ''}</span></div>` : ''}
     ${t.notas ? `<div>${ic('note')}<span class="pre">${esc(t.notas)}</span></div>` : ''}
    </div></div>
   <h2>Status</h2><div class="stset s4">${Object.entries(STATUS).map(([k, v]) => `<button class="${k} ${t.status === k ? 'on' : ''}" data-act="tarefaStatus" data-id="${t.id}" data-st="${k}">${v}</button>`).join('')}</div>
