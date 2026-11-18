@@ -47,6 +47,9 @@ export const TIPO = { compromisso: 'Compromisso', atendimento: 'Atendimento', at
 /** Tipos de item ligados a um paciente. */
 export const COM_PAC = t => t === 'atendimento';
 export const STL = { realizado: 'Realizado', faltou: 'Faltou', desmarcou: 'Desmarcou' };
+/** Dias desde o último backup (null se nunca fez). */
+export const diasSemBackup = cfg => cfg.backup && cfg.backup.ultimo ? Math.floor((Date.now() - cfg.backup.ultimo) / 864e5) : null;
+export const emailValido = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || '').trim());
 export const TEMAS = {
   classico: { nome: 'Verde', cores: ['#f4f1eb', '#2f6f68', '#e4eeeb', '#1c2320'] },
   oceano: { nome: 'Azul oceano', cores: ['#eef2f7', '#2c5c9a', '#e2eaf5', '#17202b'] },
@@ -92,6 +95,7 @@ const IC = {
   filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54z"/>',
   hist: '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
   play: '<polygon points="6 3 20 12 6 21 6 3"/>',

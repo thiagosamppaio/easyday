@@ -1,5 +1,5 @@
 // "Mais": atalhos para módulos, preferências, lembretes, privacidade, backup e cópias automáticas.
-import { $, esc, ic, today, LEMB, TIPO, TEMAS, plural } from './app-util.js';
+import { $, esc, ic, today, LEMB, TIPO, TEMAS, plural, diasSemBackup, emailValido } from './app-util.js';
 import { app, salvar, VERSAO_APP, listarCopias, lerCopia, substituirDados, migrar, novo, idbDisponivel, marcarDesfazer } from './app-dados.js';
 import { aberta } from './app-regras.js';
 import { acoes, forms, telas, aoMudar, abrirFolha, fecharFolha, cabecalho, aviso, cabecalhoTela } from './app-ui.js';
@@ -18,7 +18,7 @@ function render() {
   </div>
   <p class="note">Projetos, Anotações e Relatórios chegam na próxima atualização.</p>
 
-  <h2>Você</h2><div class="sec"><button class="item" data-act="nome"><div class="grow"><div class="t">${db.nome ? esc(db.nome) : 'Como quer ser chamado?'}</div><div class="meta">Nome exibido na saudação</div></div>${ic('r')}</button></div>
+  <h2>Minha conta</h2><div class="sec"><button class="item" data-act="conta">${ic('user')}<div class="grow"><div class="t">${db.nome ? esc(db.nome) : 'Seu nome'}</div><div class="meta">${db.cfg.backup.email ? esc(db.cfg.backup.email) : 'Cadastre seu e-mail para receber os backups'}</div></div>${ic('r')}</button></div>
 
   <h2>Aparência</h2><div class="temas">${Object.entries(TEMAS).map(([k, t]) => `<button class="tema ${(db.cfg.tema || 'classico') === k ? 'on' : ''}" data-act="tema" data-tema="${k}"><span class="amostra">${t.cores.map(c => `<i style="background:${c}"></i>`).join('')}</span>${t.nome}</button>`).join('')}</div>
   <p class="note">O modo claro ou escuro segue o do celular. Cada tema tem as duas versões.</p>
@@ -35,11 +35,12 @@ function render() {
   <p class="note">Seus dados ficam só neste aparelho e não vão para a internet. Cada pessoa que instala o app tem a própria agenda. Nas notificações, pacientes aparecem sempre por iniciais.</p>
 
   <h2>Backup e segurança</h2><div class="sec">
-   <button class="item" data-act="exportar">${ic('save')}<div class="grow"><div class="t">Exportar backup</div><div class="meta">Gera um arquivo com todos os dados</div></div></button>
+   <button class="item" data-act="enviarBackup">${ic('send')}<div class="grow"><div class="t">Enviar backup por e-mail</div><div class="meta">${textoBackup(db.cfg)}</div></div></button>
+   <button class="item" data-act="exportar">${ic('save')}<div class="grow"><div class="t">Salvar backup no aparelho</div><div class="meta">Gera um arquivo com todos os dados</div></div></button>
    <button class="item" data-act="importar">${ic('rep')}<div class="grow"><div class="t">Restaurar de arquivo</div><div class="meta">Uma cópia do estado atual é guardada antes</div></div></button>
    <button class="item" data-act="copias">${ic('hist')}<div class="grow"><div class="t">Cópias automáticas</div><div class="meta">Uma por dia, das últimas 7 aberturas</div></div>${ic('r')}</button>
   </div>
-  <p class="note">Exporte um backup de vez em quando e guarde fora do celular (Drive, e-mail). Se o app for desinstalado${nat ? '' : ' ou os dados do navegador forem apagados'}, as cópias automáticas também se perdem.</p>
+  <p class="note">${db.cfg.backup.lembrete ? 'O app lembra você de enviar o backup uma vez por semana. ' : ''}Para restaurar num celular novo, baixe o anexo do e-mail e use <b>Restaurar de arquivo</b>. Se o app for desinstalado${nat ? '' : ' ou os dados do navegador forem apagados'}, as cópias automáticas também se perdem.</p>
   ${!idbDisponivel() ? '<div class="banner">' + ic('alert') + '<span>O armazenamento principal não está disponível neste navegador; usando o modo de reserva. Faça backups com frequência.</span></div>' : ''}
   ${instalacao.evento ? `<div class="btns"><button class="btn pri" data-act="instalar">Instalar app neste aparelho</button></div>` : ''}
   <div class="btns"><button class="btn dan" data-act="zerar">Apagar todos os dados</button></div>
@@ -90,14 +91,63 @@ export function formNome() {
   <div class="btns"><button class="btn pri" type="submit">${boas ? 'Salvar' : 'Começar'}</button></div></form>`);
 }
 acoes.nome = formNome;
+
+// ---------- minha conta (fica só no aparelho: serve para enviar o backup ao seu e-mail) ----------
+function textoBackup(cfg) {
+  const d = diasSemBackup(cfg), para = cfg.backup.email ? 'Para ' + cfg.backup.email : 'Cadastre seu e-mail em Minha conta';
+  return para + ' · ' + (d === null ? 'nenhum backup ainda' : d === 0 ? 'último backup hoje' : d === 1 ? 'último backup ontem' : `último backup há ${d} dias`);
+}
+acoes.conta = () => {
+  const b = app.db.cfg.backup;
+  abrirFolha(cabecalho('Minha conta') + `<form data-form="conta">
+  <div class="f"><label class="l">Nome</label><input class="in" name="nome" value="${esc(app.db.nome)}" placeholder="Como quer ser chamado(a)" maxlength="30"></div>
+  <div class="f"><label class="l">E-mail</label><input class="in" type="email" name="email" value="${esc(b.email)}" placeholder="seuemail@gmail.com" maxlength="80" autocomplete="email"><div class="hint">É para onde o backup da agenda é enviado. Fica guardado só neste aparelho.</div></div>
+  <div class="f sec"><div class="item"><div class="grow"><div class="t">Lembrete semanal de backup</div><div class="meta">Avisa quando passar 7 dias sem backup</div></div><label class="tog"><input type="checkbox" name="lembrete" ${b.lembrete ? 'checked' : ''}><span></span></label></div></div>
+  <div class="btns"><button class="btn pri" type="submit">Salvar</button></div></form>`);
+};
+forms.conta = f => {
+  const email = f.email.value.trim();
+  if (email && !emailValido(email)) return aviso('Confira o e-mail');
+  app.db.nome = f.nome.value.trim();
+  Object.assign(app.db.cfg.backup, { email, lembrete: f.lembrete.checked });
+  salvar(); fecharFolha(); app.render(); aviso('Salvo');
+};
+const marcarBackup = () => { app.db.cfg.backup.ultimo = Date.now(); salvar(); };
+acoes.enviarBackup = async () => {
+  const b = app.db.cfg.backup;
+  if (!b.email) { aviso('Cadastre seu e-mail primeiro'); acoes.conta(); return; }
+  const nome = 'easyday-backup-' + today() + '.json';
+  const assunto = 'Backup EasyDay ' + today().split('-').reverse().join('/');
+  const texto = 'Backup da agenda EasyDay em anexo. Para restaurar: baixe o arquivo e, no app, use Mais › Restaurar de arquivo.';
+  marcarBackup();
+  const json = JSON.stringify(app.db);
+  if (app.nativo) {
+    try {
+      if (typeof app.nativo.enviarArquivo === 'function') app.nativo.enviarArquivo(nome, json, b.email, assunto, texto);
+      else { app.nativo.salvarArquivo(nome, json); aviso('Atualize o APK para enviar direto por e-mail'); }
+    } catch (e) { aviso('Não foi possível enviar'); }
+    app.render(); return;
+  }
+  const arq = new File([json], nome, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+      await navigator.share({ files: [arq], title: assunto, text: texto + ' (Envie para: ' + b.email + ')' });
+      app.render(); return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // computador: baixa o arquivo e abre o e-mail já endereçado (o anexo é colocado à mão)
+  acoes.exportar(true);
+  location.href = `mailto:${encodeURIComponent(b.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto + '\n\n(Anexe o arquivo ' + nome + ', que acabou de ser baixado.)')}`;
+};
 forms.nome = f => { app.db.nome = f.nome.value.trim(); app.db.cfg.boas = true; salvar(); fecharFolha(); app.render(); };
 
 // ---------- backup ----------
-acoes.exportar = () => {
+acoes.exportar = (silencioso) => {
+  marcarBackup();
   const nome = 'easyday-backup-' + today() + '.json', json = JSON.stringify(app.db);
   if (app.nativo) { try { app.nativo.salvarArquivo(nome, json); } catch (e) { aviso('Não foi possível exportar'); } return; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = nome;
-  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); aviso('Backup gerado');
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); if (silencioso !== true) aviso('Backup gerado');
 };
 acoes.importar = () => $('#arquivoImport').click();
 export async function importarArquivo(file) {

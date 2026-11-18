@@ -1,5 +1,5 @@
 // Service worker: funciona offline e busca a versão nova sempre que houver internet.
-const V = 'easyday-v2-1';
+const V = 'easyday-v2-2';
 const ARQUIVOS = ['./', './index.html', './app.css', './app-main.js', './app-util.js', './app-dados.js', './app-regras.js', './app-ui.js', './app-notif.js',
   './tela-inicio.js', './tela-agenda.js', './tela-tarefas.js', './tela-pacientes.js', './tela-servicos.js', './tela-mais.js', './tela-busca.js',
   './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable.png', './apple-touch-icon.png'];

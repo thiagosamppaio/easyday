@@ -1,5 +1,5 @@
 // Início (painel do dia) e captura rápida.
-import { esc, ic, uid, today, addDays, fmtLong, fmtShort, fmtRel, fmtHoras, addMin, minutos, DOW, PRIO, plural } from './app-util.js';
+import { esc, ic, uid, today, addDays, fmtLong, fmtShort, fmtRel, fmtHoras, addMin, minutos, DOW, PRIO, plural, diasSemBackup } from './app-util.js';
 import { app, salvar, servico, tocar } from './app-dados.js';
 import { ocorrenciasDoDia, chavesEmConflito, conflitosDe, aberta, atrasada, venceEmBreve, ordTarefa, passaFiltro, resumo, semanaAtual, interpretar, evTitulo, hist } from './app-regras.js';
 import { acoes, forms, telas, aoDigitar, abrirFolha, fecharFolha, cabecalho, aviso, chips, cartaoOcorrencia, linhaTarefa, saudacao, cabecalhoTela } from './app-ui.js';
@@ -57,7 +57,7 @@ function render() {
   const primeiro = !app.db.eventos.length && !app.db.tarefas.length;
   return `${cabecalhoTela(saudacao(), fmtLong(t0))}${chips()}
   ${primeiro ? `<div class="card boasvindas"><b>Comece por aqui</b><p>Toque no <b>+</b> e escreva algo como <i>"amanhã 14h reunião"</i>. Em <b>Mais › Serviços</b> você cria suas frentes de atuação, cada uma com sua cor.</p></div>` : ''}
-  ${cardAgora}${tiles}<div class="grade">${blocoHoje}${blocoTarefas}${blocoSemana}</div>`;
+  ${cardAgora}${tiles}${faixaBackup()}<div class="grade">${blocoHoje}${blocoTarefas}${blocoSemana}</div>`;
 }
 telas.inicio = { render };
 
@@ -123,3 +123,11 @@ forms.captura = (f, botao) => {
     if (t.lembrete >= 0 && t.prazo && t.hora) pedirPermissao(true);
   }
 };
+
+/** Lembrete de backup na tela inicial: aparece com 7 dias ou mais sem backup (se houver dados). */
+function faixaBackup() {
+  const c = app.db.cfg; if (!c.backup || !c.backup.lembrete) return '';
+  const temDados = app.db.eventos.length + app.db.tarefas.length + app.db.pacientes.length > 0;
+  const d = diasSemBackup(c); if (!temDados || (d !== null && d < 7)) return '';
+  return `<button class="banner" data-act="enviarBackup">${ic('save')}<span>${d === null ? 'Você ainda não fez backup da agenda.' : `Seu último backup foi há ${d} dias.`} Toque para enviar ao seu e-mail.</span></button>`;
+}

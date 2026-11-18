@@ -1,5 +1,5 @@
 // Lembretes: aviso dentro do app, notificação do navegador e alarmes nativos (APK).
-import { $, esc, ic, today, addDays, at, fmtShort, LEMB, MAX_REP_LEMB } from './app-util.js';
+import { $, esc, ic, today, addDays, at, fmtShort, LEMB, MAX_REP_LEMB, diasSemBackup } from './app-util.js';
 import { app, servico } from './app-dados.js';
 import { ocorrencias, evTitulo, aberta, atrasada } from './app-regras.js';
 import { acoes } from './app-ui.js';
@@ -64,7 +64,7 @@ export function lembretesFuturos(dias = 30) {
     if (!p || p.quando > limite) continue;
     out.push({ id: hashId('t' + t.id + '@' + t.prazo + t.hora), ...p, titulo: t.titulo, texto: 'Tarefa · prazo ' + fmtShort(t.prazo) + ' às ' + t.hora });
   }
-  out.push(...alertasDeAtraso(agora, Math.min(dias, 14)));
+  out.push(...alertasDeAtraso(agora, Math.min(dias, 14)), ...alertasDeBackup(agora));
   return out.sort((a, b) => a.quando - b.quando).slice(0, 300);
 }
 /**
@@ -100,6 +100,17 @@ function alertasDeAtraso(agora, dias) {
       const q = at(d, h).getTime(); if (q <= agora) continue;
       out.push({ id: hashId('atraso@' + d + h), quando: q, titulo: ts.length === 1 ? 'Tarefa atrasada' : ts.length + ' tarefas atrasadas', texto: resumoAtraso(ts) });
     }
+  }
+  return out;
+}
+/** Lembrete de backup: às 10h, a partir do 7º dia sem backup, um por dia (até 14 dias à frente). */
+function alertasDeBackup(agora) {
+  const b = app.db.cfg.backup; if (!b || !b.lembrete) return [];
+  if (app.db.eventos.length + app.db.tarefas.length + app.db.pacientes.length === 0) return [];
+  const dd = diasSemBackup(app.db.cfg), inicio = dd === null ? today() : addDays(today(), Math.max(0, 7 - dd)), out = [];
+  for (let i = 0; i < 14; i++) {
+    const d = addDays(inicio, i), q = at(d, '10:00').getTime();
+    if (q > agora) out.push({ id: hashId('backup@' + d), quando: q, titulo: 'Hora do backup do EasyDay', texto: b.email ? 'Toque e envie o backup para ' + b.email : 'Abra o app e envie o backup para o seu e-mail' });
   }
   return out;
 }
